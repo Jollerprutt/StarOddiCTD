@@ -32,6 +32,11 @@ class StarOddiCTD
   uint8_t data_index = 0;
   bool enable_sampling = false;
   bool DEBUG = false;
+  double rhoSea = 1.029;   //Seawater density = 1.029
+  double rhoFresh = 0.997; //Freshwater density = 0.997
+  double rho = rhoSea;     //Default is seawater
+  bool fresh = false;
+  double g = 9.80665; //gravity m/s^2
 
 public:
   uint32_t sample_delay = 1000;
@@ -62,6 +67,7 @@ public:
   double pressure = 0;     // Bar
   double depth = 0;        // M
   //double salinity = 0;   //PSU?
+  double pressureSurface = 1.01325; // Bar
 
   int16_t raw_T = 0;
   int16_t raw_P = 0;
@@ -80,6 +86,38 @@ public:
   bool status()
   {
     return STATE == CTD_STATE::PC_MODE || STATE == CTD_STATE::RECEIVE_DATA;
+  }
+
+  void freshWater()
+  {
+    rho = rhoFresh;
+    fresh = true;
+  }
+
+  void seaWater()
+  {
+    rho = rhoSea;
+    fresh = false;
+  }
+
+  bool isFresh()
+  {
+    return fresh;
+  }
+
+  double density()
+  {
+    return rho;
+  }
+
+  void densityOverride(double _rho)
+  {
+    rho = _rho;
+  }
+
+  void updateGravity(double _g)
+  {
+    g = _g;
   }
 
   bool isEnabled()
@@ -230,9 +268,12 @@ private:
   void parse_data(double T, double P, double C)
   {
 
-    printDebug("\tT: "); printDebugln(T);
-    printDebug("\tP: "); printDebugln(P);
-    printDebug("\tC: "); printDebugln(C);
+    printDebug("\tT: ");
+    printDebugln(T);
+    printDebug("\tP: ");
+    printDebugln(P);
+    printDebug("\tC: ");
+    printDebugln(C);
 
     //////////////// Temperature ////////////////
 
@@ -257,15 +298,18 @@ private:
 
     //////////////// Depth //////////////// //TODO look at this
 
+    // depth = 100 * (pressure - pressureSurface) / (rho * g);
+    depth = 100 * pressure / (rho * g);
+
     //double g = 9.80665;   //standard acceleration of gravity = 9.80665 (m/s^2)
-    double Sd = 1.026;    //Seawater density = 1.026
-    double gc = 10.19716; //gravity conversion constant = 100/g = 10.19716
+    // double Sd = 1.026;    //Seawater density = 1.026
+    // double gc = 10.19716; //gravity conversion constant = 100/g = 10.19716
 
     //If measurements are performed in seawater then
     //(8): D = Pv*gc/Sd
     //Else:
     //(9): D = Pv*gc
-    depth = pressure * gc / Sd;
+    // depth = pressure * gc / Sd;
 
     //////////////// Conductivity ////////////////
 
@@ -302,13 +346,15 @@ private:
   }
   void printDebug(String msg)
   {
-    if (DEBUG) {
+    if (DEBUG)
+    {
       Serial.print(msg);
     }
   }
   void printDebugln(String msg)
   {
-    if (DEBUG) {
+    if (DEBUG)
+    {
       Serial.println(msg);
     }
   }
